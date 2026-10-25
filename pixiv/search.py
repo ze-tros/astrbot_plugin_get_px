@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta
 
 from astrbot.api.all import Image, Plain, logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.message_components import Node, Nodes
 
-from .constants import AIOCQHTTP_PLATFORM, MAX_IMAGE_COUNT
+from .constants import (
+    AIOCQHTTP_PLATFORM,
+    DEFAULT_RANDOM_TAG,
+    DEFAULT_SEARCH_RECENT_DAYS,
+    MAX_IMAGE_COUNT,
+    PIXIV_MALE_DAILY_RANKING_MODE,
+    PIXIV_MALE_DAILY_RANKING_SOURCE_KEY,
+    SHANGHAI_TZ,
+)
 from .downloader import cleanup
 from .safety import ContentSafetyPolicy, STRICT_CONTENT_SAFETY_POLICY
 
@@ -108,7 +117,7 @@ class SearchMixin:
         use_page_cursor: bool = True,
         policy: ContentSafetyPolicy = STRICT_CONTENT_SAFETY_POLICY,
     ) -> tuple[list[dict], int, str]:
-        """优先请求 Lolicon，失败后按有无标签回退 Pixiv。"""
+        """优先请求 Lolicon，失败后按有无标签回退 Pixiv；「男性向」回退到男性向日榜。"""
         lolicon_client = getattr(self, "lolicon_client", None)
         if lolicon_client and lolicon_client.available:
             try:
@@ -136,7 +145,15 @@ class SearchMixin:
                     f"error_type={type(exc).__name__}"
                 )
 
-        pixiv_source_key = self._source_key(tag, "pixiv") if tag else "pixiv:recommended"
+        # 「男性向」不走标签热门搜索：全年代热门排序只会返回老图，
+        # 改用 Pixiv 官方男性向日榜（最近一两天 + 高收藏）。
+        use_male_daily_ranking = tag == DEFAULT_RANDOM_TAG
+        if use_male_daily_ranking:
+            pixiv_source_key = PIXIV_MALE_DAILY_RANKING_SOURCE_KEY
+        else:
+            pixiv_source_key = (
+                self._source_key(tag, "pixiv") if tag else "pixiv:recommended"
+            )
         page_offset = offset
         if use_page_cursor and page_offset == 0 and self.image_index is not None:
             try:
@@ -154,8 +171,27 @@ class SearchMixin:
         if self.client is None:
             return [], 0, pixiv_source_key
         try:
-            if tag:
-                illusts = await self.client.search(tag, offset=page_offset)
+            if use_male_daily_ranking:
+                illusts = await self.client.ranking(
+                    PIXIV_MALE_DAILY_RANKING_MODE, offset=page_offset
+                )
+                source_key = pixiv_source_key
+                if not illusts and page_offset > 0 and self.image_index is not None:
+                    # 日榜池翻到底：游标回绕后从第一页重取，避免永久空结果
+                    try:
+                        await self.image_index.advance_page_offset(
+                            self._event_scope(event), source_key, 0
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            f"{LOG_PREFIX} 日榜分页游标回绕失败: "
+                            f"error_type={type(exc).__name__}"
+                        )
+                    illusts = await self.client.ranking(
+                        PIXIV_MALE_DAILY_RANKING_MODE, offset=0
+                    )
+            elif tag:
+                illusts = await self._search_tag_with_window(tag, page_offset)
                 source_key = pixiv_source_key
             else:
                 illusts = await self.client.recommended(offset=page_offset)
@@ -168,6 +204,29 @@ class SearchMixin:
             )
             return [], 0, pixiv_source_key
         return illusts, len(illusts), source_key
+
+    async def _search_tag_with_window(self, tag: str, offset: int) -> list[dict]:
+        """标签热门搜索限定最近时间窗；窗口内无结果时逐级放宽，直到不限。
+
+        全年代热门排序会返回多年前的陈旧热门，限定窗口后优先给新图；
+        超冷门标签在窗口内可能一页都凑不出，此时放宽窗口兜底。
+        """
+        days = self._cfg_int(
+            "search_recent_days", DEFAULT_SEARCH_RECENT_DAYS, 0, 3650
+        )
+        windows = [None] if days <= 0 else [days, days * 3, None]
+        today = datetime.now(SHANGHAI_TZ).date()
+        illusts: list[dict] = []
+        for window_days in windows:
+            start_date = (
+                str(today - timedelta(days=window_days)) if window_days else None
+            )
+            illusts = await self.client.search(
+                tag, offset=offset, start_date=start_date, end_date=str(today)
+            )
+            if illusts:
+                break
+        return illusts
 
     async def _record_image_usage(
         self,
@@ -217,6 +276,12 @@ class SearchMixin:
         except (TypeError, ValueError):
             count = 1
 
+        # 无标签请求改用默认标签搜索，避免 Pixiv 推荐流混入低收藏新图；
+        # random_tag 留空可恢复无标签纯随机行为。
+        user_tag = tag.strip()
+        default_tag = self._cfg_str("random_tag", DEFAULT_RANDOM_TAG).strip()
+        tag = user_tag or default_tag
+
         # 金币预检：请求张数 × 单价，余额不足直接提醒并终止。
         if self._p_charging_active():
             sender_id = str(event.get_sender_id() or "")
@@ -250,7 +315,9 @@ class SearchMixin:
         )
         logger.info(
             f"{LOG_PREFIX} 搜索候选获取完成: "
-            f"tag_configured={'yes' if tag else 'no'} "
+            f"tag_configured={'yes' if user_tag else 'no'} "
+            f"random_tag_applied={'yes' if not user_tag and default_tag else 'no'} "
+            f"effective_tag={tag or '-'} "
             f"source={_search_source_label(source_key)} "
             f"requested_count={count} quality={_search_quality_label(quality)} "
             f"candidate_count={raw_count}"

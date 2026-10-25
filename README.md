@@ -7,7 +7,7 @@
 一个面向 AstrBot 的安全发图与签到插件：Lolicon 优先取图，失败时可用 Pixiv refresh_token 回退，并在 WebUI 管理群排行、成员数值、内容安全和签到数据。
 
 ![AstrBot](https://img.shields.io/badge/AstrBot-plugin-5865f2?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.8.0-22c55e?style=flat-square)
+![Version](https://img.shields.io/badge/version-3.8.3-22c55e?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-OneBot%20%2F%20aiocqhttp-f97316?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-3b82f6?style=flat-square)
@@ -178,6 +178,8 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | 配置 | 建议 |
 | --- | --- |
 | `pixiv_refresh_token` | 可选，作为 Lolicon 失败后的 Pixiv 回退 |
+| `random_tag` | 无标签取图默认用「男性向」搜索（Pixiv 走男性向日榜，新图+高收藏）；想恢复纯随机可留空 |
+| `search_recent_days` | 带标签搜索默认限定最近 90 天热门，避免老图；冷门标签搜不到时自动放宽兜底 |
 | `image_quality` | 省流量用 `large`，优先原图用 `original` |
 | `forward_threshold` | 仅 aiocqhttp：`0` 始终合并转发；`1` 表示超过 1 张图才合并转发 |
 | `checkin_card_quality_tier` | 默认 `省流量`；日常推荐 `清晰`，高分辨率显示可选 `极致`；签到卡与日历完全同档（省流量 1600×900、清晰 2080×1170、极致 2880×1620） |
@@ -196,6 +198,8 @@ WebUI 配置页按以下 6 组折叠展示，分组细节与维护规则见 [doc
 | `lolicon_api_url` | Lolicon 首选图片源地址；留空时停用 Lolicon | `https://api.lolicon.app/setu/v2` |
 | `lolicon_exclude_ai` | 请求 Lolicon 时排除 AI 作品；R18/普通混合由当前会话强制普通分级决定 | `true` |
 | `lolicon_image_proxy_origins` | 可选 Lolicon 图片反代 origin，多行按顺序轮换；不代理 API 或 Pixiv 登录 | 空 |
+| `random_tag` | `/p` 或自然语言不带标签取图时改用该标签搜索；Pixiv 侧「男性向」映射到官方男性向日榜，其他标签按热门排序；留空恢复纯随机 | `男性向` |
+| `search_recent_days` | 标签搜索热门排序限定最近 N 天（0–3650），窗口无结果自动放宽至不限；0=不限 | `90` |
 | `filter_manga` | 过滤 Pixiv 回退结果中的漫画作品 | `true` |
 | `max_count` | 单次最大发送数量，范围 1-20 | `5` |
 | `dedupe_days` | 最近 `0–7` 个北京时间自然日去重；`0` 为关闭并清空去重索引 | `1` |

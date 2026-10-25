@@ -29,6 +29,23 @@
         "obvious_hint": true,
         "hint": "可选，每行填写一个完整的 http(s) origin，最多使用 5 个并按顺序尝试；拒绝账号密码、路径、query 和 fragment，重复项自动删除。仅改写 Lolicon 来源且位于允许列表中的 Pixiv 图片主机，不代理 API、Pixiv 登录或其他网络请求。全部失败后回退 Lolicon 返回地址；留空表示不改写，保存并重载插件后生效。"
       },
+      "random_tag": {
+        "description": "无标签默认搜索标签",
+        "type": "string",
+        "default": "男性向",
+        "hint": "/p 或自然语言不带标签取图时，改用该标签向 Lolicon 与 Pixiv 搜索；Pixiv 侧「男性向」固定映射到官方男性向日榜（最近一两天高收藏作品，避免全年代热门返回老图），其他标签按热门排序搜索。留空恢复无标签纯随机。"
+      },
+      "search_recent_days": {
+        "description": "标签搜索时间窗（天）",
+        "type": "int",
+        "default": 90,
+        "slider": {
+          "min": 0,
+          "max": 365,
+          "step": 30
+        },
+        "hint": "带标签搜索热门排序限定最近 N 天，避免翻出陈年老图；窗口内一页都凑不出时自动放宽到 3 倍窗口直至不限，超冷门标签仍能兜底。0=不限（旧行为）。"
+      },
       "max_count": {
         "description": "单次最大发送数量",
         "type": "int",

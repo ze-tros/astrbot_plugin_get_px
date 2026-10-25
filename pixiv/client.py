@@ -113,15 +113,24 @@ class PixivClient:
                 raise RuntimeError("Pixiv 客户端已关闭") from exc
             return await self._wait_for(factory(), operation=operation)
 
-    async def search(self, tag: str, offset: int = 0) -> list[dict]:
+    async def search(
+        self,
+        tag: str,
+        offset: int = 0,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict]:
         api = await self._acquire_api()
         try:
             resp = await self._wait_for_with_retry(
                 lambda: api.search_illust(
                     tag,
-                    search_target="partial_match_for_tags",
-                    sort="date_desc",
+                    search_target="exact_match_for_tags",
+                    sort="popular_desc",
                     offset=offset,
+                    start_date=start_date,
+                    end_date=end_date,
                 ),
                 operation="搜索请求",
             )
@@ -135,6 +144,17 @@ class PixivClient:
             resp = await self._wait_for_with_retry(
                 lambda: api.illust_recommended(offset=offset),
                 operation="推荐作品请求",
+            )
+        finally:
+            await self._release_api()
+        return list(resp.get("illusts") or [])
+
+    async def ranking(self, mode: str, offset: int = 0) -> list[dict]:
+        api = await self._acquire_api()
+        try:
+            resp = await self._wait_for_with_retry(
+                lambda: api.illust_ranking(mode=mode, offset=offset),
+                operation="排行榜请求",
             )
         finally:
             await self._release_api()

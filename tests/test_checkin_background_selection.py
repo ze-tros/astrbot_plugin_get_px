@@ -37,7 +37,14 @@ class FakePixivClient:
         self.recommended_offsets.append(offset)
         return list(self.pages.get(offset, []))
 
-    async def search(self, tag: str, offset: int = 0):
+    async def search(
+        self,
+        tag: str,
+        offset: int = 0,
+        *,
+        start_date=None,
+        end_date=None,
+    ):
         self.search_calls.append((tag, offset))
         return list(self.search_pages.get((tag, offset), []))
 
@@ -303,9 +310,10 @@ class CheckinBackgroundSelectionTest(unittest.IsolatedAsyncioTestCase):
                     )
                 self.assertIsNotNone(background)
                 self.assertEqual(background.source, "pixiv:search:available")
+                # "empty" 标签在时间窗内无结果，会先走 90 天→270 天→不限的放宽阶梯
                 self.assertEqual(
                     plugin.client.search_calls,
-                    [("empty", 0), ("available", 0)],
+                    [("empty", 0), ("empty", 0), ("empty", 0), ("available", 0)],
                 )
             finally:
                 plugin.image_index.close()
