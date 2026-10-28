@@ -534,21 +534,43 @@ class SearchMixin:
                                 if attempt < max_retries:
                                     await asyncio.sleep(attempt * 2)
                                 else:
-                                    friendly_err = self._friendly_send_error(e)
-                                    logger.error(
-                                        f"{LOG_PREFIX} 降级发送失败: "
-                                        f"illust_id={illust_id} attempts={max_retries} "
-                                        f"reason={friendly_err} "
-                                        f"error_type={type(e).__name__}"
+                                    rotated_sent = await self._resend_with_rotation(
+                                        event,
+                                        path=path,
+                                        title=title,
+                                        illust_id=str(illust_id),
                                     )
-                                    try:
-                                        await event.send(
-                                            event.plain_result(
-                                                f"⚠️ 作品 {illust_id}「{title}」发送失败，已跳过"
+                                    if rotated_sent:
+                                        if illust.get("id"):
+                                            sent_illust_ids.add(
+                                                str(illust.get("id"))
                                             )
+                                        logger.info(
+                                            f"{LOG_PREFIX} [降级] 作品 {illust_id} 旋转重发成功"
                                         )
-                                    except Exception:
-                                        pass
+                                        await self._record_image_usage(
+                                            event,
+                                            source_key,
+                                            illust,
+                                            feature="normal",
+                                            user_id=str(event.get_sender_id() or ""),
+                                        )
+                                    else:
+                                        friendly_err = self._friendly_send_error(e)
+                                        logger.error(
+                                            f"{LOG_PREFIX} 降级发送失败: "
+                                            f"illust_id={illust_id} attempts={max_retries} "
+                                            f"reason={friendly_err} "
+                                            f"error_type={type(e).__name__}"
+                                        )
+                                        try:
+                                            await event.send(
+                                                event.plain_result(
+                                                    f"⚠️ 作品 {illust_id}「{title}」发送失败，已跳过"
+                                                )
+                                            )
+                                        except Exception:
+                                            pass
                 else:
                     for illust, path, actual_q, file_size in downloaded:
                         await self._record_image_usage(
@@ -598,21 +620,38 @@ class SearchMixin:
                                 )
                                 await asyncio.sleep(wait_sec)
                             else:
-                                friendly_err = self._friendly_send_error(e)
-                                logger.error(
-                                    f"{LOG_PREFIX} 作品发送失败: "
-                                    f"illust_id={illust_id} attempts={max_retries} "
-                                    f"reason={friendly_err} "
-                                    f"error_type={type(e).__name__}"
+                                rotated_sent = await self._resend_with_rotation(
+                                    event,
+                                    path=path,
+                                    title=title,
+                                    illust_id=str(illust_id),
                                 )
-                                try:
-                                    await event.send(
-                                        event.plain_result(
-                                            f"⚠️ 作品 {illust_id}「{title}」发送失败，已跳过"
-                                        )
+                                if rotated_sent:
+                                    if illust.get("id"):
+                                        sent_illust_ids.add(str(illust.get("id")))
+                                    await self._record_image_usage(
+                                        event,
+                                        source_key,
+                                        illust,
+                                        feature="normal",
+                                        user_id=str(event.get_sender_id() or ""),
                                     )
-                                except Exception:
-                                    pass
+                                else:
+                                    friendly_err = self._friendly_send_error(e)
+                                    logger.error(
+                                        f"{LOG_PREFIX} 作品发送失败: "
+                                        f"illust_id={illust_id} attempts={max_retries} "
+                                        f"reason={friendly_err} "
+                                        f"error_type={type(e).__name__}"
+                                    )
+                                    try:
+                                        await event.send(
+                                            event.plain_result(
+                                                f"⚠️ 作品 {illust_id}「{title}」发送失败，已跳过"
+                                            )
+                                        )
+                                    except Exception:
+                                        pass
         finally:
             if self._p_charging_active() and sent_illust_ids:
                 total_cost = self._p_unit_cost() * len(sent_illust_ids)
