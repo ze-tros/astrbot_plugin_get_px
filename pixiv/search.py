@@ -12,8 +12,8 @@ from .constants import (
     DEFAULT_RANDOM_TAG,
     DEFAULT_SEARCH_RECENT_DAYS,
     MAX_IMAGE_COUNT,
-    PIXIV_MALE_DAILY_RANKING_MODE,
-    PIXIV_MALE_DAILY_RANKING_SOURCE_KEY,
+    PIXIV_RANDOM_RANKING_MODE,
+    PIXIV_RANDOM_RANKING_SOURCE_KEY,
     SHANGHAI_TZ,
 )
 from .downloader import cleanup
@@ -117,7 +117,7 @@ class SearchMixin:
         use_page_cursor: bool = True,
         policy: ContentSafetyPolicy = STRICT_CONTENT_SAFETY_POLICY,
     ) -> tuple[list[dict], int, str]:
-        """优先请求 Lolicon，失败后按有无标签回退 Pixiv；「男性向」回退到男性向日榜。"""
+        """优先请求 Lolicon，失败后按有无标签回退 Pixiv；「男性向」回退到月榜。"""
         lolicon_client = getattr(self, "lolicon_client", None)
         if lolicon_client and lolicon_client.available:
             try:
@@ -146,10 +146,10 @@ class SearchMixin:
                 )
 
         # 「男性向」不走标签热门搜索：全年代热门排序只会返回老图，
-        # 改用 Pixiv 官方男性向日榜（最近一两天 + 高收藏）。
-        use_male_daily_ranking = tag == DEFAULT_RANDOM_TAG
-        if use_male_daily_ranking:
-            pixiv_source_key = PIXIV_MALE_DAILY_RANKING_SOURCE_KEY
+        # 改用 Pixiv 官方月榜（近期 + 高收藏，池子比日榜更大）。
+        use_random_ranking = tag == DEFAULT_RANDOM_TAG
+        if use_random_ranking:
+            pixiv_source_key = PIXIV_RANDOM_RANKING_SOURCE_KEY
         else:
             pixiv_source_key = (
                 self._source_key(tag, "pixiv") if tag else "pixiv:recommended"
@@ -171,24 +171,24 @@ class SearchMixin:
         if self.client is None:
             return [], 0, pixiv_source_key
         try:
-            if use_male_daily_ranking:
+            if use_random_ranking:
                 illusts = await self.client.ranking(
-                    PIXIV_MALE_DAILY_RANKING_MODE, offset=page_offset
+                    PIXIV_RANDOM_RANKING_MODE, offset=page_offset
                 )
                 source_key = pixiv_source_key
                 if not illusts and page_offset > 0 and self.image_index is not None:
-                    # 日榜池翻到底：游标回绕后从第一页重取，避免永久空结果
+                    # 月榜池翻到底：游标回绕后从第一页重取，避免永久空结果
                     try:
                         await self.image_index.advance_page_offset(
                             self._event_scope(event), source_key, 0
                         )
                     except Exception as exc:
                         logger.warning(
-                            f"{LOG_PREFIX} 日榜分页游标回绕失败: "
+                            f"{LOG_PREFIX} 月榜分页游标回绕失败: "
                             f"error_type={type(exc).__name__}"
                         )
                     illusts = await self.client.ranking(
-                        PIXIV_MALE_DAILY_RANKING_MODE, offset=0
+                        PIXIV_RANDOM_RANKING_MODE, offset=0
                     )
             elif tag:
                 illusts = await self._search_tag_with_window(tag, page_offset)

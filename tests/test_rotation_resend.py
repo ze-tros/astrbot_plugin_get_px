@@ -151,7 +151,7 @@ class _RotationFlowHarness(SearchMixin, DeliveryMixin):
         use_page_cursor=True, policy=None,
     ):
         illusts = [{"id": "123:0", "title": "测试图"}]
-        return illusts, len(illusts), "pixiv:ranking:day_male"
+        return illusts, len(illusts), "pixiv:ranking:month"
 
     class _Downloader:
         def __init__(self, png_path: str):

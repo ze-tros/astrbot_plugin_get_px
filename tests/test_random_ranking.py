@@ -1,4 +1,4 @@
-"""「男性向」回退 Pixiv 男性向日榜的回归测试。"""
+"""「男性向」回退 Pixiv 月榜的回归测试。"""
 
 import sys
 from pathlib import Path
@@ -78,15 +78,15 @@ async def _fetch(harness, tag, offset=0, use_page_cursor=True):
 
 
 @pytest.mark.asyncio
-async def test_male_tag_uses_day_male_ranking() -> None:
+async def test_male_tag_uses_month_ranking() -> None:
     client = _RankingClient()
     harness = _FetchHarness(client)
     illusts, raw_count, source_key = await _fetch(harness, "男性向")
-    assert client.ranking_calls == [("day_male", 0)]
+    assert client.ranking_calls == [("month", 0)]
     assert client.search_calls == []
     assert client.recommended_calls == []
-    assert source_key == "pixiv:ranking:day_male"
-    assert illusts == [{"id": "r-day_male-0"}]
+    assert source_key == "pixiv:ranking:month"
+    assert illusts == [{"id": "r-month-0"}]
     assert raw_count == 1
 
 
@@ -96,8 +96,8 @@ async def test_male_tag_ranking_uses_page_cursor_offset() -> None:
     index = _CursorIndex(page_offset=60)
     harness = _FetchHarness(client, image_index=index)
     _, _, source_key = await _fetch(harness, "男性向")
-    assert client.ranking_calls == [("day_male", 60)]
-    assert source_key == "pixiv:ranking:day_male"
+    assert client.ranking_calls == [("month", 60)]
+    assert source_key == "pixiv:ranking:month"
 
 
 @pytest.mark.asyncio
@@ -106,10 +106,10 @@ async def test_ranking_exhausted_page_wraps_cursor_and_refetches() -> None:
     index = _CursorIndex(page_offset=300)
     harness = _FetchHarness(client, image_index=index)
     illusts, _, source_key = await _fetch(harness, "男性向")
-    assert client.ranking_calls == [("day_male", 300), ("day_male", 0)]
-    assert index.advances == [("pixiv:ranking:day_male", 0)]
+    assert client.ranking_calls == [("month", 300), ("month", 0)]
+    assert index.advances == [("pixiv:ranking:month", 0)]
     assert illusts == [{"id": "first-page"}]
-    assert source_key == "pixiv:ranking:day_male"
+    assert source_key == "pixiv:ranking:month"
 
 
 @pytest.mark.asyncio
