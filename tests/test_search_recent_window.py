@@ -1,4 +1,4 @@
-"""标签搜索时间窗（search_recent_days）的回归测试。"""
+"""标签搜索时间窗（search_recent_days）与收藏倒序的回归测试。"""
 
 import sys
 from datetime import datetime, timedelta
@@ -50,54 +50,52 @@ class _WindowHarness(SearchMixin):
 
 
 @pytest.mark.asyncio
-async def test_search_uses_default_90_day_window() -> None:
-    client = _WindowClient([[{"id": 1}]])
+async def test_search_uses_default_three_year_window() -> None:
+    client = _WindowClient([[{"id": 1, "total_bookmarks": 10}]])
     harness = _WindowHarness(client)
     illusts = await harness._search_tag_with_window("原神", 0)
     assert client.calls == [
-        ("原神", 0, _expected_start(90), _expected_end())
+        ("原神", 0, _expected_start(1095), _expected_end())
     ]
-    assert illusts == [{"id": 1}]
+    assert illusts == [{"id": 1, "total_bookmarks": 10}]
 
 
 @pytest.mark.asyncio
-async def test_search_widens_to_triple_window_when_empty() -> None:
-    client = _WindowClient([[], [{"id": 2}]])
+async def test_search_sorts_by_bookmarks_desc() -> None:
+    client = _WindowClient(
+        [[
+            {"id": "low", "total_bookmarks": 12},
+            {"id": "top", "total_bookmarks": 900},
+            {"id": "mid", "total_bookmarks": 300},
+            {"id": "none", "total_bookmarks": None},
+        ]]
+    )
     harness = _WindowHarness(client)
-    illusts = await harness._search_tag_with_window("冷门标签", 0)
-    assert [call[2] for call in client.calls] == [
-        _expected_start(90),
-        _expected_start(270),
-    ]
-    assert illusts == [{"id": 2}]
-
-
-@pytest.mark.asyncio
-async def test_search_falls_back_to_unlimited_window() -> None:
-    client = _WindowClient([[], [], [{"id": 3}]])
-    harness = _WindowHarness(client)
-    illusts = await harness._search_tag_with_window("超冷门标签", 0)
-    assert [call[2] for call in client.calls] == [
-        _expected_start(90),
-        _expected_start(270),
-        None,
-    ]
-    assert illusts == [{"id": 3}]
+    illusts = await harness._search_tag_with_window("某标签", 0)
+    assert [item["id"] for item in illusts] == ["top", "mid", "low", "none"]
 
 
 @pytest.mark.asyncio
 async def test_zero_days_disables_window() -> None:
-    client = _WindowClient([[{"id": 4}]])
+    client = _WindowClient([[{"id": 4, "total_bookmarks": 5}]])
     harness = _WindowHarness(client, config={"search_recent_days": 0})
     illusts = await harness._search_tag_with_window("原神", 0)
     assert client.calls == [("原神", 0, None, _expected_end())]
-    assert illusts == [{"id": 4}]
+    assert illusts == [{"id": 4, "total_bookmarks": 5}]
 
 
 @pytest.mark.asyncio
-async def test_all_windows_empty_returns_empty() -> None:
-    client = _WindowClient([[], [], []])
+async def test_custom_window_days() -> None:
+    client = _WindowClient([[{"id": 5, "total_bookmarks": 1}]])
+    harness = _WindowHarness(client, config={"search_recent_days": 180})
+    await harness._search_tag_with_window("原神", 0)
+    assert client.calls == [("原神", 0, _expected_start(180), _expected_end())]
+
+
+@pytest.mark.asyncio
+async def test_empty_window_returns_empty() -> None:
+    client = _WindowClient([[]])
     harness = _WindowHarness(client)
     illusts = await harness._search_tag_with_window("无人问津", 0)
-    assert len(client.calls) == 3
+    assert len(client.calls) == 1  # 不再有放宽阶梯
     assert illusts == []
