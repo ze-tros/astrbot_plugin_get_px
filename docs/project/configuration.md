@@ -11,7 +11,7 @@
 | `lolicon_exclude_ai` | `bool` | `true` | 仅向 Lolicon API 传递 excludeAI=true/false；R18 与普通混合由当前会话强制普通分级决定 |
 | `lolicon_image_proxy_origins` | `text` | 空 | 每行一个 http(s) origin，最多 5 个按序尝试；仅改写允许列表内 Pixiv 图片主机 |
 | `random_tag` | `string` | `男性向` | `/p` 或自然语言不带标签取图时，改用该标签向 Lolicon 与 Pixiv 搜索；Pixiv 侧「男性向」固定映射到官方月榜（近期高收藏，池子大），其他标签按热门排序；留空恢复无标签纯随机 |
-| `search_recent_days` | `int` | `1095` | 带标签搜索限定最近 N 天并按收藏数倒序返回，避免翻出陈年老图；窗口内无结果返回空，0=不限（旧行为） |
+| `search_recent_days` | `int` | `1095` | 带标签搜索限定最近 N 天并按收藏数倒序返回，避免翻出陈年老图；窗口内无结果时自动放宽到 3 倍窗口直至不限，0=不限（旧行为） |
 | `max_count` | `int` | `5` | 单次指令最多发送张数，范围 1–20 |
 | `p_coin_cost` | `int` | `20` | `/p` 成功发图每张金币，范围 0–200；0 免费 |
 | `image_quality` | `enum` | `original` | `original`/`large`/`medium`；超阈值自动降级 |

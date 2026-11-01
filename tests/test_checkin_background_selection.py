@@ -310,9 +310,10 @@ class CheckinBackgroundSelectionTest(unittest.IsolatedAsyncioTestCase):
                     )
                 self.assertIsNotNone(background)
                 self.assertEqual(background.source, "pixiv:search:available")
+                # "empty" 标签在时间窗内无结果，会先走 三年→九年→不限 的放宽阶梯
                 self.assertEqual(
                     plugin.client.search_calls,
-                    [("empty", 0), ("available", 0)],
+                    [("empty", 0), ("empty", 0), ("empty", 0), ("available", 0)],
                 )
             finally:
                 plugin.image_index.close()

@@ -208,16 +208,24 @@ class SearchMixin:
     async def _search_tag_with_window(self, tag: str, offset: int) -> list[dict]:
         """标签搜索：限定最近 N 天（默认三年）并按收藏数倒序返回。
 
-        全年代热门排序会返回陈旧经典，限定窗口后优先新图；
+        全年代热门排序会返回陈旧经典，限定窗口后优先新图；窗口内一页都
+        凑不出时逐级放宽（3 倍窗口直至不限），超冷门标签仍能兜底。
         API 的 popular_desc 与严格收藏排序略有出入，本地按收藏数再排一次。"""
         days = self._cfg_int(
             "search_recent_days", DEFAULT_SEARCH_RECENT_DAYS, 0, 3650
         )
+        windows = [None] if days <= 0 else [days, days * 3, None]
         today = datetime.now(SHANGHAI_TZ).date()
-        start_date = str(today - timedelta(days=days)) if days > 0 else None
-        illusts = await self.client.search(
-            tag, offset=offset, start_date=start_date, end_date=str(today)
-        )
+        illusts: list[dict] = []
+        for window_days in windows:
+            start_date = (
+                str(today - timedelta(days=window_days)) if window_days else None
+            )
+            illusts = await self.client.search(
+                tag, offset=offset, start_date=start_date, end_date=str(today)
+            )
+            if illusts:
+                break
         illusts.sort(
             key=lambda item: int(item.get("total_bookmarks") or 0), reverse=True
         )
