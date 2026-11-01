@@ -1,4 +1,4 @@
-"""「男性向」回退 Pixiv 月榜的回归测试。"""
+"""「男性向」按会话分级回退 Pixiv 月榜 / R18 周榜的回归测试。"""
 
 import sys
 from pathlib import Path
@@ -7,6 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from astrbot_plugin_get_px.pixiv.safety import ContentSafetyPolicy
 from astrbot_plugin_get_px.pixiv.search import SearchMixin
 
 
@@ -71,9 +72,10 @@ class _Event:
         return "10001"
 
 
-async def _fetch(harness, tag, offset=0, use_page_cursor=True):
+async def _fetch(harness, tag, offset=0, use_page_cursor=True, policy=None):
     return await harness._fetch_source_candidates(
-        _Event(), tag, count=20, offset=offset, use_page_cursor=use_page_cursor
+        _Event(), tag, count=20, offset=offset, use_page_cursor=use_page_cursor,
+        policy=policy or ContentSafetyPolicy(),
     )
 
 
@@ -88,6 +90,17 @@ async def test_male_tag_uses_month_ranking() -> None:
     assert source_key == "pixiv:ranking:month"
     assert illusts == [{"id": "r-month-0"}]
     assert raw_count == 1
+
+
+@pytest.mark.asyncio
+async def test_male_tag_uses_week_r18_ranking_when_general_only_disabled() -> None:
+    client = _RankingClient()
+    harness = _FetchHarness(client)
+    policy = ContentSafetyPolicy(general_only_enabled=False)
+    illusts, _, source_key = await _fetch(harness, "男性向", policy=policy)
+    assert client.ranking_calls == [("week_r18", 0)]
+    assert source_key == "pixiv:ranking:week_r18"
+    assert illusts == [{"id": "r-week_r18-0"}]
 
 
 @pytest.mark.asyncio
